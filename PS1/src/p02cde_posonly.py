@@ -71,9 +71,9 @@ def main(train_path, valid_path, test_path, pred_path):
     # Part (e): Apply correction factor using validation set and test on true labels
     # Plot and use np.savetxt to save outputs to pred_path_e
 
-    x_eval, y_eval = util.load_dataset(valid_path, label_col='y', add_intercept=True)
-    x_eval_labeled = x_eval[y_eval==1]
-    clf_y.predict(x_eval_labeled) # I don't need the predictions. I just need to run it to generate h(x)
+    x_valid, y_valid = util.load_dataset(valid_path, label_col='y', add_intercept=True)
+    x_valid_labeled = x_valid[y_valid==1]
+    clf_y.predict(x_valid_labeled) # I don't need the predictions. I just need to run it to generate h(x)
     alpha_estimated = np.mean(clf_y.h)
 
     theta_corrected = clf_y.theta
@@ -87,5 +87,17 @@ def main(train_path, valid_path, test_path, pred_path):
     
     accuracy = util.accuracy_score(t_test, pred)
     print(f"The accuracy of the logistic regression model is: {100 * accuracy:.10f} %")
+
+    # Sanity check
+    print('The estimated alpha is:',alpha_estimated)
+
+    def label_ratio(dataset_path):
+        # Among all positive examples (t=1), what is the portion of the data is labeled (y=1)
+        x, y = util.load_dataset(train_path, label_col='y', add_intercept=True)
+        x, t = util.load_dataset(train_path, label_col='t', add_intercept=True)
+        return (y==1).sum() / (t==1).sum()
+    print('In the training set, among all the positive data (t=1), the ratio of the data labeled (y=1) is:',label_ratio(train_path))
+    print('In the validation set, among all the positive data (t=1), the ratio of the data labeled (y=1) is:',label_ratio(valid_path))
+    print('In the test set, among all the positive data (t=1), the ratio of the data labeled (y=1) is:',label_ratio(test_path))
     
     # *** END CODER HERE
