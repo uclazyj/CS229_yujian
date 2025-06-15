@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-
+import pandas as pd
 
 def add_intercept(x):
     """Add intercept to matrix x.
@@ -60,7 +60,7 @@ def load_dataset(csv_path, label_col='y', add_intercept=False):
     return inputs, labels
 
 
-def plot(x, y, theta, save_path=None, correction=1.0):
+def plot(x, y, theta=[], save_path=None, correction=1.0, title=''):
     """Plot dataset and fitted logistic regression parameters.
     Args:
         x: Matrix of training examples, one per row.
@@ -74,17 +74,35 @@ def plot(x, y, theta, save_path=None, correction=1.0):
     plt.plot(x[y == 1, -2], x[y == 1, -1], 'bx', linewidth=2)
     plt.plot(x[y == 0, -2], x[y == 0, -1], 'go', linewidth=2)
 
-    # Plot decision boundary (found by solving for theta^T x = 0)
     margin1 = (max(x[:, -2]) - min(x[:, -2]))*0.2
     margin2 = (max(x[:, -1]) - min(x[:, -1]))*0.2
-    x1 = np.arange(min(x[:, -2])-margin1, max(x[:, -2])+margin1, 0.01)
-    x2 = -(theta[0] / theta[2] * correction + theta[1] / theta[2] * x1)
-    plt.plot(x1, x2, c='red', linewidth=2)
+    # Plot decision boundary (found by solving for theta^T x = 0)
+    if len(theta) > 0:  
+        x1 = np.arange(min(x[:, -2])-margin1, max(x[:, -2])+margin1, 0.01)
+        x2 = -(theta[0] / theta[2] * correction + theta[1] / theta[2] * x1)
+        plt.plot(x1, x2, c='red', linewidth=2)
     plt.xlim(x[:, -2].min()-margin1, x[:, -2].max()+margin1)
     plt.ylim(x[:, -1].min()-margin2, x[:, -1].max()+margin2)
 
     # Add labels and save to disk
     plt.xlabel('x1')
     plt.ylabel('x2')
+    if title != '':
+        plt.title(title)
     if save_path is not None:
         plt.savefig(save_path)
+
+
+def save_prediction(data, path, usePandas=True):
+    """
+    data should be a 1D numpy array. data will be saved as a csv file.
+    """
+    if usePandas:
+        df = pd.DataFrame(data, columns=['y_pred'])
+        df.to_csv(path, index=False)
+    else:
+        np.savetxt(path, data, delimiter=',', fmt='%.1f')
+
+def accuracy_score(y_true, y_pred):
+    return np.sum(y_true == y_pred) / len(y_true)
+

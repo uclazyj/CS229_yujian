@@ -28,8 +28,64 @@ def main(train_path, valid_path, test_path, pred_path):
     # *** START CODE HERE ***
     # Part (c): Train and test on true labels
     # Make sure to save outputs to pred_path_c
+
+    x_train, t_train = util.load_dataset(train_path, label_col='t', add_intercept=True)
+    m, n = x_train.shape
+    theta_0 = np.zeros(n)
+
+    clf_t = LogisticRegression(step_size=0.2, max_iter=100, eps=1e-4, theta_0=theta_0)
+    clf_t.fit(x_train, t_train)
+
+    x_test, t_test = util.load_dataset(test_path, label_col='t', add_intercept=True)
+    predictions = clf_t.predict(x_test)
+    util.save_prediction(predictions, pred_path_c)
+
+    accuracy = util.accuracy_score(t_test, predictions)
+    print(f"The accuracy of the logistic regression model is: {100 * accuracy:.1f} %")
+
+    util.plot(x_train, t_train, clf_t.theta, title='training set (trained with t labels)')
+    util.plot(x_test, t_test, clf_t.theta, title='test set (trained with t labels)')
+    
     # Part (d): Train on y-labels and test on true labels
     # Make sure to save outputs to pred_path_d
+
+
+    x_train, y_train = util.load_dataset(train_path, label_col='y', add_intercept=True)
+    m, n = x_train.shape
+    theta_0 = np.zeros(n)
+
+    clf_y = LogisticRegression(step_size=0.2, max_iter=100, eps=1e-5, theta_0=theta_0)
+    clf_y.fit(x_train, y_train)
+
+    x_test, y_test = util.load_dataset(test_path, label_col='y', add_intercept=True)
+    predictions = clf_y.predict(x_test)
+    util.save_prediction(predictions, pred_path_d)
+
+    accuracy = util.accuracy_score(y_test, predictions)
+    print(f"The accuracy of the logistic regression model is: {100 * accuracy:.1f} %")
+
+    util.plot(x_train, y_train, clf_y.theta, title='training set (trained with y labels)')
+    util.plot(x_test, y_test, clf_y.theta, title='test set (trained with y labels)')
+
+    
     # Part (e): Apply correction factor using validation set and test on true labels
     # Plot and use np.savetxt to save outputs to pred_path_e
+
+    x_eval, y_eval = util.load_dataset(valid_path, label_col='y', add_intercept=True)
+    x_eval_labeled = x_eval[y_eval==1]
+    clf_y.predict(x_eval_labeled) # I don't need the predictions. I just need to run it to generate h(x)
+    alpha_estimated = np.mean(clf_y.h)
+
+    theta_corrected = clf_y.theta
+    theta_corrected[0] += np.log(2/alpha_estimated - 1)
+    x_test, t_test = util.load_dataset(test_path, label_col='t', add_intercept=True)
+    util.plot(x_test, t_test, theta_corrected, title='test set (trained with y labels and apply correction)')
+
+    pred = x_test @ theta_corrected > 0
+    pred = pred.astype(int)
+    util.save_prediction(predictions, pred_path_e)
+    
+    accuracy = util.accuracy_score(t_test, pred)
+    print(f"The accuracy of the logistic regression model is: {100 * accuracy:.10f} %")
+    
     # *** END CODER HERE
