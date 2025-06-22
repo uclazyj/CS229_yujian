@@ -74,7 +74,7 @@ def load_spam_dataset(tsv_path):
 
     return messages, np.array(labels)
 
-def plot(x, y, theta, save_path, correction=1.0):
+def plot(x, y, theta=[], save_path=None, correction=1.0):
     """Plot dataset and fitted logistic regression parameters.
 
     Args:
@@ -87,17 +87,20 @@ def plot(x, y, theta, save_path, correction=1.0):
     # Plot dataset
     plt.figure()
     plt.plot(x[y == 1, -2], x[y == 1, -1], 'bx', linewidth=2)
-    plt.plot(x[y == 0, -2], x[y == 0, -1], 'go', linewidth=2)
+    # the negative label may be 0 or -1
+    plt.plot(x[y <= 0, -2], x[y <= 0, -1], 'go', linewidth=2)
 
     # Plot decision boundary (found by solving for theta^T x = 0)
-    x1 = np.arange(min(x[:, -2]), max(x[:, -2]), 0.01)
-    x2 = -(theta[0] / theta[2] * correction + theta[1] / theta[2] * x1)
-    plt.plot(x1, x2, c='red', linewidth=2)
+    if len(theta) > 0:
+        x1 = np.arange(min(x[:, -2]), max(x[:, -2]), 0.01)
+        x2 = -(theta[0] / theta[2] * correction + theta[1] / theta[2] * x1)
+        plt.plot(x1, x2, c='red', linewidth=2)
 
     # Add labels and save to disk
     plt.xlabel('x1')
     plt.ylabel('x2')
-    plt.savefig(save_path)
+    if save_path is not None:
+        plt.savefig(save_path)
 
 
 def plot_contour(predict_fn):
