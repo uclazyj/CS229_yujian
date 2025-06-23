@@ -21,6 +21,8 @@ def get_words(message):
     """
 
     # *** START CODE HERE ***
+    words = message.split()
+    return [word.lower() for word in words]
     # *** END CODE HERE ***
 
 
@@ -41,6 +43,19 @@ def create_dictionary(messages):
     """
 
     # *** START CODE HERE ***
+    occurrence_in_messages = collections.defaultdict(int)
+    for message in messages:
+        words = get_words(message)
+        words_set = set(words)
+        for word in words_set:
+            occurrence_in_messages[word] += 1
+    word_to_index = {}
+    idx = 0
+    for word in occurrence_in_messages:
+        if occurrence_in_messages[word] >= 5:
+            word_to_index[word] = idx
+            idx += 1
+    return word_to_index
     # *** END CODE HERE ***
 
 
@@ -62,6 +77,17 @@ def transform_text(messages, word_dictionary):
         A numpy array marking the words present in each message.
     """
     # *** START CODE HERE ***
+    m = len(messages)
+    n = len(word_dictionary)
+    a = np.zeros((m, n))
+    for i, message in enumerate(messages):
+        words = get_words(message)
+        word_count = collections.Counter(words)
+        for word in word_count:
+            if word in word_dictionary:
+                idx = word_dictionary[word]
+                a[i][idx] = word_count[word]
+    return a
     # *** END CODE HERE ***
 
 
@@ -82,6 +108,16 @@ def fit_naive_bayes_model(matrix, labels):
     """
 
     # *** START CODE HERE ***
+    # The matrix is the output of transform_text. So matrix[i][j] represents the number of times the j_th word in the dictionary appear in message i.
+    # We want a matrix contains 0 and 1 only, where matrix[i][j] = 1 means the j_th word in the dictionary appears in message i, and matrix[i][j] = 0 means it does not appear.
+    X = matrix > 0
+    m, n = X.shape
+    spam = X[labels==1]
+    nonspam = X[labels==0]
+    phi_y = spam.shape[0] / m
+    phi_y0 = (1 + nonspam.sum(axis=0)) / (2 + nonspam.shape[0])
+    phi_y1 = (1 + spam.sum(axis=0)) / (2 + spam.shape[0])
+    return (phi_y0, phi_y1, phi_y)
     # *** END CODE HERE ***
 
 
@@ -98,6 +134,34 @@ def predict_from_naive_bayes_model(model, matrix):
     Returns: A numpy array containg the predictions from the model
     """
     # *** START CODE HERE ***
+    phi_y0, phi_y1, phi_y = model
+    X = matrix > 0
+
+    # m, n = X.shape
+    # predictions = []
+    # for i in range(m):
+    #     x = X[i]
+    #     # When x_j = 1, P(x_j|y=1) = phi_j|y=1. When x_j = 0, P(x_j|y=1) = 1 - phi_j|y=1
+    #     Px_y1 = phi_y1 * x + (1 - phi_y1) * (~x)
+    #     Px_y0 = phi_y0 * x + (1 - phi_y0) * (~x)
+    #     # Calculating the product directly will cause underflow.
+    #     # Instead of calculating P1 * P2 * ... Pn, we calculate exp[ln(P1)+ln(P2)+...+ln(Pn)]
+    #     Px_y1_product = np.exp(np.log(Px_y1).sum())
+    #     Px_y0_product = np.exp(np.log(Px_y0).sum())
+    #     P_y1 = (Px_y1_product * phi_y) / (Px_y1_product * phi_y + Px_y0_product * (1 - phi_y))
+    #     predictions.append(P_y1)
+    # return np.array(predictions) > 0.5
+
+    Px_y1 = phi_y1 * X + (1 - phi_y1) * (~X)
+    Px_y0 = phi_y0 * X + (1 - phi_y0) * (~X)
+    Px_y1_product = np.exp(np.log(Px_y1).sum(axis=1))
+    Px_y0_product = np.exp(np.log(Px_y0).sum(axis=1))
+    P_y1 = (Px_y1_product * phi_y) / (Px_y1_product * phi_y + Px_y0_product * (1 - phi_y))
+    return P_y1 > 0.5
+    
+
+    
+
     # *** END CODE HERE ***
 
 
@@ -114,6 +178,15 @@ def get_top_five_naive_bayes_words(model, dictionary):
     Returns: The top five most indicative words in sorted order with the most indicative first
     """
     # *** START CODE HERE ***
+    phi_y0, phi_y1, phi_y = model
+    spam_metric = np.log(phi_y1 / phi_y0)
+    print(spam_metric.shape)
+    words = [(metric, i) for i, metric in enumerate(spam_metric)]
+    words.sort(reverse = True)
+    top_five_index = [words[i][1] for i in range(5)]
+    index_to_word = {dictionary[word]: word for word in dictionary}
+    top_five_words = [index_to_word[idx] for idx in top_five_index]
+    return top_five_words
     # *** END CODE HERE ***
 
 
@@ -134,6 +207,13 @@ def compute_best_svm_radius(train_matrix, train_labels, val_matrix, val_labels, 
         The best radius which maximizes SVM accuracy.
     """
     # *** START CODE HERE ***
+    a = []
+    for radius in radius_to_consider:
+        predictions = svm.train_and_predict_svm(train_matrix, train_labels, val_matrix, radius)
+        accuracy = (predictions == val_labels).mean()
+        a.append((accuracy, radius))
+    a.sort(reverse = True)
+    return a[0][1]
     # *** END CODE HERE ***
 
 
