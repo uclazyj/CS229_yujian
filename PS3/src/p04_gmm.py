@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from collections import Counter
 
 PLOT_COLORS = ['red', 'green', 'blue', 'orange']  # Colors for your plots
 K = 4           # Number of Gaussians in the mixture model
@@ -28,10 +29,24 @@ def main(is_semi_supervised, trial_num):
     # *** START CODE HERE ***
     # (1) Initialize mu and sigma by splitting the m data points uniformly at random
     # into K groups, then calculating the sample mean and covariance for each group
+
+    np.random.shuffle(x)
+    x_split = np.array_split(x, K)
+    mu = []
+    sigma = []
+    for j in range(K):
+        mu_j = x_split[j].mean(axis=0)
+        sigma_j = np.cov(x_split[j], rowvar=False, bias=True)
+        mu.append(mu_j)
+        sigma.append(sigma_j)
+        
     # (2) Initialize phi to place equal probability on each Gaussian
     # phi should be a numpy array of shape (K,)
+    phi = np.ones(K) / K
     # (3) Initialize the w values to place equal probability on each Gaussian
     # w should be a numpy array of shape (m, K)
+    m,n = x.shape
+    w = np.ones((m, K)) / K
     # *** END CODE HERE ***
 
     if is_semi_supervised:
@@ -73,17 +88,49 @@ def run_em(x, w, phi, mu, sigma):
     # See below for explanation of the convergence criterion
     it = 0
     ll = prev_ll = None
+    m, n = x.shape
+    ll_all = []
     while it < max_iter and (prev_ll is None or np.abs(ll - prev_ll) >= eps):
-        pass  # Just a placeholder for the starter code
         # *** START CODE HERE
+        it += 1
         # (1) E-step: Update your estimates in w
+        for i in range(m):
+            for j in range(K):
+                a = x[i] - mu[j]
+                w[i][j] =  np.exp(-(a.T @ np.linalg.inv(sigma[j]) @ a)/2) * phi[j] / (2 * np.pi) ** (n/2) / np.sqrt(np.linalg.det(sigma[j]))
+            w[i,:] = w[i,:] / np.sum(w[i,:])
+            
         # (2) M-step: Update the model parameters phi, mu, and sigma
+        phi = w.sum(axis=0) / m
+
+        # When updating sigma, we should use the mu from the previous step. So we calculate sigma first.
+        for j in range(K):
+            a = x - mu[j]
+            sigma[j] = (w[:,j].reshape(1,m) * a.T) @ a / w[:,j].sum()
+        
+        for j in range(K):
+            mu[j] = (w[:,j:j+1] * x).sum(axis=0) / w[:,j].sum()
+
         # (3) Compute the log-likelihood of the data to check for convergence.
         # By log-likelihood, we mean `ll = sum_x[log(sum_z[p(x|z) * p(z)])]`.
         # We define convergence by the first iteration where abs(ll - prev_ll) < eps.
         # Hint: For debugging, recall part (a). We showed that ll should be monotonically increasing.
-        # *** END CODE HERE ***
-
+        prev_ll = ll
+        ll = 0
+        for i in range(m):
+            p = 0
+            for j in range(K):
+                a = x[i] - mu[j]
+                p += 1 / (2 * np.pi) ** (n/2) / np.sqrt(np.linalg.det(sigma[j])) * np.exp(-a.T @ np.linalg.inv(sigma[j]) @ a / 2) * phi[j]
+            ll += np.log(p)
+        ll_all.append(ll)
+        
+    print(f"Ran {it} iterations.")
+    plt.figure()
+    plt.plot(ll_all)
+    plt.title('Log likelihood')
+    plt.show()
+    # *** END CODE HERE ***
     return w
 
 
@@ -115,21 +162,66 @@ def run_semi_supervised_em(x, x_tilde, z, w, phi, mu, sigma):
     # See below for explanation of the convergence criterion
     it = 0
     ll = prev_ll = None
+    ll_all = []
+    m, n = x.shape
+    m_tilde, _ = x_tilde.shape
+    z = z.reshape(-1).astype(int)
+    label_count = Counter(z)
     while it < max_iter and (prev_ll is None or np.abs(ll - prev_ll) >= eps):
-        pass  # Just a placeholder for the starter code
         # *** START CODE HERE ***
+        it += 1
         # (1) E-step: Update your estimates in w
+        for i in range(m):
+            for j in range(K):
+                a = x[i] - mu[j]
+                w[i][j] =  np.exp(-(a.T @ np.linalg.inv(sigma[j]) @ a)/2) * phi[j] / (2 * np.pi) ** (n/2) / np.sqrt(np.linalg.det(sigma[j]))
+            w[i,:] = w[i,:] / np.sum(w[i,:])
+                    
         # (2) M-step: Update the model parameters phi, mu, and sigma
+        phi = w.sum(axis=0)
+        for j in range(K):
+            phi[j] += alpha * label_count[j]
+        phi = phi / (m + alpha * m_tilde)
+
+        # When updating sigma, we should use the mu from the previous step. So we calculate sigma first.
+        for j in range(K):
+            a = x - mu[j]
+            a_tilde = x_tilde - mu[j]
+            a_tilde = a_tilde[z==j,:]
+            sigma[j] = ((w[:,j].reshape(1,m) * a.T) @ a + alpha * a_tilde.T @ a_tilde) / (w[:,j].sum() + alpha * label_count[j])
+        
+        for j in range(K):
+            mu[j] = ((w[:,j:j+1] * x).sum(axis=0) + alpha * x_tilde[z==j,:].sum(axis=0)) / (w[:,j].sum() + alpha * label_count[j])
+            
         # (3) Compute the log-likelihood of the data to check for convergence.
         # Hint: Make sure to include alpha in your calculation of ll.
         # Hint: For debugging, recall part (a). We showed that ll should be monotonically increasing.
-        # *** END CODE HERE ***
-
+        prev_ll = ll
+        ll = 0
+        for i in range(m):
+            p = 0
+            for j in range(K):
+                p += gaussian_density(x[i], mu[j], sigma[j]) * phi[j]
+            ll += np.log(p)
+        for i in range(m_tilde):
+            ll += alpha * np.log(gaussian_density(x_tilde[i], mu[z[i]], sigma[z[i]]) * phi[z[i]])
+        ll_all.append(ll)
+        
+    print(f"Ran {it} iterations.")
+    plt.figure()
+    plt.plot(ll_all)
+    plt.title('Log likelihood')
+    plt.show()
+    # *** END CODE HERE ***
     return w
 
 
 # *** START CODE HERE ***
 # Helper functions
+def gaussian_density(x, mu, sigma):
+    n = len(x)
+    a = x - mu
+    return 1 / (2 * np.pi) ** (n/2) / np.sqrt(np.linalg.det(sigma)) * np.exp(-a.T @ np.linalg.inv(sigma) @ a / 2)
 # *** END CODE HERE ***
 
 
@@ -197,5 +289,5 @@ if __name__ == '__main__':
         # Once you've implemented the semi-supervised version,
         # uncomment the following line.
         # You do not need to add any other lines in this code block.
-        # main(with_supervision=True, trial_num=t)
+        main(is_semi_supervised=True, trial_num=t)
         # *** END CODE HERE ***
